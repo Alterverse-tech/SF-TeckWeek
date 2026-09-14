@@ -2,6 +2,11 @@ let lastGood = null;
 const coverCache = new Map(), coverQueue = [];
 let activeCovers = 0;
 const coverOrigins = new Set(['https://partiful.imgix.net','https://partiful-posters.imgix.net','https://cdn.tech-week.com','https://firebasestorage.googleapis.com']);
+// Hosts that send Access-Control-Allow-Origin: * — the only posters a hosted
+// player can load (covers are fetched into a blob; the wall texture loads them
+// anonymous). Same list as CORS_POSTER_ORIGINS in feed-slim.mjs.
+const coverCorsOrigins = new Set(['https://partiful.imgix.net','https://partiful-posters.imgix.net','https://firebasestorage.googleapis.com','https://media0.giphy.com','https://media1.giphy.com','https://media2.giphy.com','https://media3.giphy.com']);
+const corsPoster = source => { try { return coverCorsOrigins.has(new URL(source).origin); } catch { return false; } };
 function coverUrl(source) {
   if(!coverOrigins.has(new URL(source).origin))return Promise.reject(new Error('Unsupported public cover origin'));
   if(coverCache.has(source))return coverCache.get(source);
@@ -32,13 +37,25 @@ export function mergePublicFeeds(saved, cache) {
   // Enrichment can add a Partiful URL to an existing calendar ID. Match that
   // ID too, so moving from the baseline to richer data cannot duplicate it.
   const ids = new Map([...map].filter(([, event]) => event.id != null).map(([key, event]) => [event.id, key]));
+  // A newer poster URL on a host without the CORS header is a worse fact than
+  // an older one that loads, so this one field never downgrades — even when a
+  // complete newer feed replaces the older one outright.
+  const was = new Map(older.events.map(e => [eventKey(e), e]));
+  const wasIds = new Map(older.events.filter(e => e.id != null).map(e => [e.id, e]));
+  const keepPoster = (event, before) => {
+    if (!before || !event.image || corsPoster(event.image) || !corsPoster(before.image)) return event;
+    const fieldSources = {...event.fieldSources};
+    if (before.fieldSources?.image) fieldSources.image = before.fieldSources.image; else delete fieldSources.image;
+    return {...event, image: before.image, fieldSources};
+  };
   for (const event of newer.events) {
     const key = eventKey(event), previousKey = map.has(key) ? key : ids.get(event.id), previous = map.get(previousKey);
-    if (!previous) { map.set(key,event); if (event.id != null) ids.set(event.id, key); continue; }
-    const patch = Object.fromEntries(Object.entries(event).filter(([field,value]) =>
-      event.fieldSources?.[field] || (value != null && value !== '' && value !== 'unknown' && (!Array.isArray(value) || value.length))));
+    if (!previous) { map.set(key, keepPoster(event, was.get(key) || wasIds.get(event.id))); if (event.id != null) ids.set(event.id, key); continue; }
+    const reading = keepPoster(event, previous);
+    const patch = Object.fromEntries(Object.entries(reading).filter(([field,value]) =>
+      reading.fieldSources?.[field] || (value != null && value !== '' && value !== 'unknown' && (!Array.isArray(value) || value.length))));
     if (previousKey !== key) map.delete(previousKey);
-    map.set(key, {...previous,...patch,id:previous.id,fieldSources:{...previous.fieldSources,...event.fieldSources}});
+    map.set(key, {...previous,...patch,id:previous.id,fieldSources:{...previous.fieldSources,...reading.fieldSources}});
     if (previous.id != null) ids.set(previous.id, key);
     if (event.id != null) ids.set(event.id, key);
   }

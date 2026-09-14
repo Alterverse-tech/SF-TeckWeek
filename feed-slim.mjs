@@ -11,6 +11,44 @@ import { createHash } from 'node:crypto';
 // the kept value and never the audit trail, so it belongs with the archive.
 const DROP = ['fieldSources', 'sourceConflicts', 'imageUsage', 'calendarUrl', 'calendarId', 'locationVisibility', 'source', 'sourceLabel', 'acquisition'];
 
+// A poster reaches the player only when its host answers cross-origin: the
+// hosted page fetches covers into a blob (its img-src admits blob: alone) and
+// the wall texture loads them with crossOrigin 'anonymous'. These hosts send
+// Access-Control-Allow-Origin: *. cdn.tech-week.com serves the same images
+// without it, so a URL there is a poster nobody sees. events-sync.js carries
+// the same list for the runtime merge; a test keeps the two identical.
+export const CORS_POSTER_ORIGINS = Object.freeze(['https://partiful.imgix.net', 'https://partiful-posters.imgix.net', 'https://firebasestorage.googleapis.com', 'https://media0.giphy.com', 'https://media1.giphy.com', 'https://media2.giphy.com', 'https://media3.giphy.com']);
+export function corsPoster(url) {
+  try { return CORS_POSTER_ORIGINS.includes(new URL(url).origin); } catch { return false; }
+}
+
+// How many posters in a feed a hosted player can actually load.
+export function posterOriginReport(events) {
+  const byOrigin = new Map();
+  let withImage = 0, blocked = 0;
+  for (const event of events) {
+    if (!event.image) continue;
+    withImage += 1;
+    let origin = '(unparseable)';
+    try { origin = new URL(event.image).origin; } catch {}
+    byOrigin.set(origin, (byOrigin.get(origin) || 0) + 1);
+    if (!corsPoster(event.image)) blocked += 1;
+  }
+  return { withImage, blocked, share: withImage ? blocked / withImage : 0, byOrigin: Object.fromEntries([...byOrigin].sort((a, b) => b[1] - a[1])) };
+}
+
+// The build refuses a feed most of whose posters cannot load, the way it
+// refuses a moved patch target. The September listing moved 98% of them to a
+// host without the header and every wall in the live city went blank before
+// anyone noticed; the handful that were already there stay under the bar.
+export const MAX_BLOCKED_POSTER_SHARE = 0.10;
+export function assertPosterOrigins(feed, { maxBlockedShare = MAX_BLOCKED_POSTER_SHARE } = {}) {
+  const report = posterOriginReport(feed.events || []);
+  if (report.share <= maxBlockedShare) return report;
+  const hosts = Object.entries(report.byOrigin).filter(([origin]) => !CORS_POSTER_ORIGINS.includes(origin)).map(([origin, n]) => `${origin} ×${n}`).join(', ');
+  throw new Error(`Poster origins changed: ${report.blocked} of ${report.withImage} posters (${(report.share * 100).toFixed(1)}%) sit on hosts that send no CORS header — ${hosts}. A hosted player cannot load them. Keep the previous CORS-capable URLs (node scripts/reconcile-snapshot.mjs <previous-snapshot.json>) or add the host to CORS_POSTER_ORIGINS once it sends Access-Control-Allow-Origin.`);
+}
+
 // Same door test as scripts/merge-approved-addresses.mjs: a leading house
 // number (not an ordinal street like 11th St) and any floor, suite or unit.
 const DOOR = /^\s*(?:no\.?\s*)?\d+[a-z]?(?:\s*[-–/]\s*\d+[a-z]?)?\s+/i;
@@ -98,6 +136,7 @@ export function splitUtf8(text, maxBytes = FEED_PART_BYTES) {
 export async function slimFeedParts(dir, base) {
   const { text, manifest, manifestUrl } = await readFeedText(dir, base);
   const slim = slimFeed(JSON.parse(text)), after = JSON.stringify(slim);
+  assertPosterOrigins(slim);
   const beforeBytes = Buffer.byteLength(text), afterBytes = Buffer.byteLength(after);
   if (!manifest && afterBytes <= FEED_PART_BYTES) {
     await writeFile(new URL(`${base}.json`, dir), after);
@@ -116,4 +155,22 @@ export async function slimFeedParts(dir, base) {
   await Promise.all([`${base}.json`, ...(manifest?.parts || []).filter(name => !parts.includes(name))]
     .map(name => rm(new URL(name, dir), { force: true })));
   return { before: beforeBytes, after: afterBytes, parts: parts.length };
+}
+
+// The archive in data/ is one JSON document stored as raw slices under the
+// importer's per-file text limit. Scripts write it; builds only read it.
+export const ARCHIVE_PART_BYTES = 3 * 1024 * 1024;
+export async function writeArchiveParts(dir, base, feed) {
+  const text = JSON.stringify(feed);
+  const { manifest } = await readFeedText(dir, base).catch(() => ({ manifest: null }));
+  const contents = splitUtf8(text, ARCHIVE_PART_BYTES);
+  const parts = contents.map((_, index) => `${base}.part-${String(index).padStart(3, '0')}.json`);
+  await Promise.all(parts.map((name, index) => writeFile(new URL(name, dir), contents[index])));
+  await writeFile(new URL(`${base}.parts.json`, dir), JSON.stringify({
+    file: `${base}.json`, parts, bytes: Buffer.byteLength(text),
+    sha256: createHash('sha256').update(text).digest('hex'), events: feed.events.length,
+    note: "The snapshot exceeds the importer's per-file text limit. Parts are raw slices of one JSON document and must be joined in order; a partial set is not a smaller snapshot.",
+  }, null, 2) + '\n');
+  await Promise.all([`${base}.json`, ...(manifest?.parts || []).filter(name => !parts.includes(name))].map(name => rm(new URL(name, dir), { force: true })));
+  return { bytes: Buffer.byteLength(text), parts: parts.length };
 }
