@@ -67,8 +67,15 @@ test('the shipped venue-overrides.json is well formed and publishes no door', ()
   assert.ok(Array.isArray(shipped.events));
   for (const entry of shipped.addresses) {
     assert.ok(entry.eventId || entry.eventUrl, 'every entry names its event');
-    assert.equal(entry.doorWithheld, true);
+    assert.equal(typeof entry.doorWithheld, 'boolean', `doorWithheld is stated in ${entry.eventId}`);
+    // The file never carries a door, whichever kind of entry it is.
     assert.doesNotMatch(String(entry.street || ''), DOOR, `no house number in ${entry.eventId}`);
+    // An event whose address the event page already publishes is here only to
+    // gain a building coordinate: it must not carry a `street`, which would
+    // replace that public address with a street without its number.
+    if (entry.doorWithheld === false) {
+      assert.equal(entry.street, undefined, `${entry.eventId} publishes its door, so it states no street`);
+    }
   }
   for (const event of shipped.events) assert.doesNotMatch(String(event.address || ''), DOOR);
 });
