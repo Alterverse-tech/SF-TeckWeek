@@ -2,7 +2,7 @@
 
 Saved: 2026-09-14T08:13:41.733Z
 
-1638 unique events; 1580 successfully read detail pages. **Complete calendar inventory; detail fields remain partial.**
+1638 unique events; 1583 successfully read detail pages. **Complete calendar inventory; detail fields remain partial.**
 
 Calendar pages: 35; reported total: 1638.
 
@@ -11,20 +11,20 @@ Calendar pages: 35; reported total: 1638.
 | title | 1638 / 1638 |
 | host | 1638 / 1638 |
 | start | 1638 / 1638 |
-| end | 1035 / 1638 |
-| tags | 359 / 1638 |
+| end | 1038 / 1638 |
+| tags | 362 / 1638 |
 | neighborhood | 1636 / 1638 |
 | address | 216 / 1638 |
 | venue | 226 / 1638 |
 | mapUrl | 258 / 1638 |
 | lat | 145 / 1638 |
 | lng | 145 / 1638 |
-| description | 1580 / 1638 |
+| description | 1583 / 1638 |
 | speakers | 8 / 1638 |
-| cohosts | 879 / 1638 |
+| cohosts | 880 / 1638 |
 | image | 1632 / 1638 |
 | url | 1638 / 1638 |
-| rsvp | 638 / 1638 |
+| rsvp | 640 / 1638 |
 | capacity | 325 / 1638 |
 | remainingCapacity | 325 / 1638 |
 | status | 1632 / 1638 |

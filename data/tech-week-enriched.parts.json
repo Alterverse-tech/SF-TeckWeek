@@ -4,8 +4,8 @@
     "tech-week-enriched.part-000.json",
     "tech-week-enriched.part-001.json"
   ],
-  "bytes": 5555288,
-  "sha256": "d2172b6938779d9cd4526c70d18ab9037fcc7585094b2535cfed3c3e0ed05177",
+  "bytes": 6263118,
+  "sha256": "b7eb4276138cc9961625a2da778a80305c16bc1387df8e3bb5076eec216af83e",
   "events": 1638,
   "note": "The snapshot exceeds the importer's per-file text limit. Parts are raw slices of one JSON document and must be joined in order; a partial set is not a smaller snapshot."
 }
