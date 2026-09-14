@@ -970,19 +970,30 @@ function buildBillboards(TW, city) {
     pending = setTimeout(step, 0);
   };
 
-  // A poster goes up the moment its cover is in memory: sized by the cover's
-  // own proportions, flush on the wall, top-aligned in its slot.
+  // A poster goes up as soon as the event is planned. If its remote cover is
+  // blocked by hosted-page CORS, the generated event poster stays on the wall;
+  // a later successful cover load upgrades the same panel in place.
   const raise = (plan, i, event) => {
-    if (plan.panels.has(event)) return plan.panels.get(event);
+    const existing = plan.panels.get(event);
+    if (existing) {
+      if (event.coverImg && !existing.userData.withCover) {
+        const texture = coverTexture(T, event, existing.userData.aspect);
+        (texture.userData.meshes ||= []).push(existing);
+        existing.material.uniforms.map.value = texture;
+        existing.userData.withCover = true;
+      }
+      return existing;
+    }
     const im = event.coverImg;
-    const aspect = Math.max(SIGN_ASPECT.min, Math.min(SIGN_ASPECT.max, im.height / im.width));
+    const aspect = im ? Math.max(SIGN_ASPECT.min, Math.min(SIGN_ASPECT.max, im.height / im.width)) : 1;
     const slot = plan.slots[i], seg = plan.seg;
     const w = slot.w, h = w * aspect;
     const dx = (seg.bx - seg.ax) / seg.len, dz = (seg.bz - seg.az) / seg.len;
-    const panel = new T.Mesh(new T.PlaneGeometry(w, h), billboardMaterial(T, city, coverTexture(T, event, aspect)));
+    const texture = im ? coverTexture(T, event, aspect) : posterTexture(T, TW, event);
+    const panel = new T.Mesh(new T.PlaneGeometry(w, h), billboardMaterial(T, city, texture));
     panel.position.set(seg.ax + dx * slot.u + seg.nx * SIGN_CLEAR, slot.yTop - h / 2, seg.az + dz * slot.u + seg.nz * SIGN_CLEAR);
     panel.rotation.y = Math.atan2(seg.nx, seg.nz);
-    panel.userData.ev = event; panel.userData.textured = true; panel.userData.aspect = aspect;
+    panel.userData.ev = event; panel.userData.textured = true; panel.userData.withCover = !!im; panel.userData.aspect = aspect;
     panel.userData.appear = 0; panel.scale.setScalar(0.01);            // it grows onto the glass over a few frames
     (panel.material.uniforms.map.value.userData.meshes ||= []).push(panel);
     root.add(panel);
@@ -1003,23 +1014,17 @@ function buildBillboards(TW, city) {
       const d = Math.hypot((seg.ax + seg.bx) / 2 - cx, seg.y1 - cy, (seg.az + seg.bz) / 2 - cz);
       if (d > FAR_SIGN) { for (const panel of p.panels.values()) panel.visible = false; if (d > LOAD_SIGN) continue; }
       p.members.forEach((event, i) => {
-        if (event.coverImg) {
-          if (d > FAR_SIGN) return;
-          const panel = raise(p, i, event);
-          panel.visible = true;
-          if (panel.userData.appear < 1) { panel.userData.appear = Math.min(1, panel.userData.appear + 0.14); const k = panel.userData.appear; panel.scale.setScalar(0.01 + 0.99 * (1 - (1 - k) * (1 - k))); }
-          if (!panel.userData.textured) {
-            const texture = coverTexture(T, event, panel.userData.aspect);
-            (texture.userData.meshes ||= []).push(panel);
-            panel.material.uniforms.map.value = texture; panel.userData.textured = true;
-          }
-          const want = d < NEAR_SIGN ? 1.32 : d < MID_SIGN ? 1.12 : 0.92;
-          const u = panel.material.uniforms.uLight;
-          u.value += (want - u.value) * 0.25;
-        } else if (event.image && !event.coverFailed && !event.coverPending && !event.coverNear && typeof TW.loadCover === 'function') {
+        if (event.image && !event.coverImg && !event.coverFailed && !event.coverPending && !event.coverNear && d <= LOAD_SIGN && typeof TW.loadCover === 'function') {
           event.coverNear = true;
           try { TW.loadCover(event); } catch (error) { event.coverFailed = true; }
         }
+        if (d > FAR_SIGN) return;
+        const panel = raise(p, i, event);
+        panel.visible = true;
+        if (panel.userData.appear < 1) { panel.userData.appear = Math.min(1, panel.userData.appear + 0.14); const k = panel.userData.appear; panel.scale.setScalar(0.01 + 0.99 * (1 - (1 - k) * (1 - k))); }
+        const want = d < NEAR_SIGN ? 1.32 : d < MID_SIGN ? 1.12 : 0.92;
+        const u = panel.material.uniforms.uLight;
+        u.value += (want - u.value) * 0.25;
       });
     }
   };
