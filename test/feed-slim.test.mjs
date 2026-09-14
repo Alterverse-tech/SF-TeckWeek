@@ -32,7 +32,7 @@ test('UTF-8 chunks obey byte limits at every Chinese and emoji boundary without 
   assert.throws(() => splitUtf8(text, 3), /at least four bytes/);
 })
 
-test('the real event snapshot becomes eight bounded parts with the exact existing slim payload', async t => {
+test('the real event snapshot becomes bounded parts with the exact existing slim payload', async t => {
   const directory = await fixture(t);
   const originalManifest = await readFile(new URL(`${base}.parts.json`, data));
   const manifest = JSON.parse(originalManifest);
@@ -42,8 +42,13 @@ test('the real event snapshot becomes eight bounded parts with the exact existin
   const expected = JSON.stringify(slimFeed(JSON.parse(original)));
   const result = await slimFeedParts(directory, base);
   const built = JSON.parse(await readFile(new URL(`${base}.parts.json`, directory), 'utf8'));
-  assert.equal(result.parts, 8);
-  assert.equal(built.parts.length, 8);
+  // The part count follows the payload size, which moves with every refresh, so
+  // it is derived rather than pinned: as few parts as the size limit allows,
+  // with one spare for a split nudged back off a surrogate pair.
+  const fewestParts = Math.ceil(Buffer.byteLength(expected) / FEED_PART_BYTES);
+  assert.equal(result.parts, built.parts.length);
+  assert.ok(result.parts >= fewestParts && result.parts <= fewestParts + 1,
+    `expected about ${fewestParts} parts, got ${result.parts}`);
   assert.equal(result.before, Buffer.byteLength(original));
   assert.equal(result.after, Buffer.byteLength(expected));
   const buffers = await Promise.all(built.parts.map(name => readFile(new URL(name, directory))));
