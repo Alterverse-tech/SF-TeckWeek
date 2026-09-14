@@ -1,6 +1,6 @@
 {
   "note": "Game-layer venue supplements entered by the project owner from public event pages. Only the building is published: `street` never carries a house number or unit, `lat`/`lng` are filled by scripts/geocode-venue-overrides.mjs (run where the network allows; the full address lives only in the gitignored .local/venue-doors.json), and the exact door stays in the Discord. `events` are listings the public crawl has not picked up yet: appended at runtime. Give a supplement its registration `url` — that is how it is recognised and dropped once the crawl carries the same event; without one it would be listed twice. A moderator-approved entry from /addresses.json takes precedence over an entry here for the same event.",
-  "updatedAt": "2026-09-11T00:00:00.000Z",
+  "updatedAt": "2026-09-14T00:00:00.000Z",
   "addresses": [
     {
       "eventId": "partiful-IDX1j40sjTDhK6Pp5ewl",
@@ -112,6 +112,73 @@
       "enteredAt": "2026-09-11T00:00:00.000Z",
       "eventUrl": "https://partiful.com/e/ki3B28FwMa8i9BleQA9U",
       "note": "The public crawl now carries this listing; this entry only withholds the door and fixes the neighbourhood."
+    },
+    {
+      "eventId": "techweek-sf-a78ff83c",
+      "eventUrl": "https://partiful.com/e/0t3E5XQ4FuJYFdWO9Amr",
+      "venue": "Ray Florets",
+      "neighborhood": "Downtown (SF)",
+      "lat": null,
+      "lng": null,
+      "doorWithheld": false,
+      "source": "public event page, entered by the project owner",
+      "enteredAt": "2026-09-14T00:00:00.000Z"
+    },
+    {
+      "eventId": "partiful-uVaN948XbkjXXofpjaVt",
+      "eventUrl": "https://partiful.com/e/uVaN948XbkjXXofpjaVt",
+      "venue": "WorkOS SF HQ",
+      "neighborhood": "Downtown (SF)",
+      "lat": null,
+      "lng": null,
+      "doorWithheld": false,
+      "source": "public event page, entered by the project owner",
+      "enteredAt": "2026-09-14T00:00:00.000Z"
+    },
+    {
+      "eventId": "partiful-2tq9G7ZFGlW9OMN2qob1",
+      "eventUrl": "https://partiful.com/e/2tq9G7ZFGlW9OMN2qob1",
+      "venue": "Finix",
+      "neighborhood": "Downtown (SF)",
+      "lat": 37.7866671,
+      "lng": -122.40505,
+      "doorWithheld": false,
+      "source": "public event page, entered by the project owner",
+      "enteredAt": "2026-09-14T00:00:00.000Z",
+      "geocodeSource": "OpenStreetMap Nominatim house-number node, cached in data/tech-week-geocode.json"
+    },
+    {
+      "eventId": "partiful-XaBTYkfWChPrquuI6uPH",
+      "eventUrl": "https://partiful.com/e/XaBTYkfWChPrquuI6uPH",
+      "neighborhood": "SOMA",
+      "lat": null,
+      "lng": null,
+      "doorWithheld": false,
+      "source": "public event page, entered by the project owner",
+      "enteredAt": "2026-09-14T00:00:00.000Z"
+    },
+    {
+      "eventId": "partiful-ZAxqIIxvUpPC4947hvmu",
+      "eventUrl": "https://partiful.com/e/ZAxqIIxvUpPC4947hvmu",
+      "venue": "Stable Cafe",
+      "street": "Folsom St",
+      "neighborhood": "Mission",
+      "lat": null,
+      "lng": null,
+      "doorWithheld": true,
+      "source": "public event page, entered by the project owner",
+      "enteredAt": "2026-09-14T00:00:00.000Z"
+    },
+    {
+      "eventId": "partiful-8zBGLoo578Xce7PRtsti",
+      "eventUrl": "https://partiful.com/e/8zBGLoo578Xce7PRtsti",
+      "street": "Sansome St",
+      "neighborhood": "FiDi (SF)",
+      "lat": null,
+      "lng": null,
+      "doorWithheld": true,
+      "source": "public event page, entered by the project owner",
+      "enteredAt": "2026-09-14T00:00:00.000Z"
     }
   ],
   "events": []

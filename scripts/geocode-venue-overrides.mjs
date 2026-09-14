@@ -82,7 +82,9 @@ for (const entry of overrides.addresses) {
   if (!hit) { await sleep(1100); try { hit = await nominatim(door); } catch (error) { console.warn(`  Nominatim failed for ${entry.eventId}: ${error.message}`); } }
   if (!hit || !inSF(hit.lat, hit.lng)) { refused += 1; console.warn(`  ! ${entry.eventId}: no building-level match inside San Francisco; left unplaced`); continue; }
   entry.lat = hit.lat; entry.lng = hit.lng;
-  entry.street = streetOnly(entry.street || door);
+  // An entry whose door is already public keeps the address the event page
+  // shows; only a withheld door is published as a street without its number.
+  if (entry.doorWithheld !== false) entry.street = streetOnly(entry.street || door);
   entry.geocodedAt = new Date().toISOString();
   entry.geocodeSource = hit.source;
   done += 1;
