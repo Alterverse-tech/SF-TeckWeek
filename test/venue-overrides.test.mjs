@@ -10,6 +10,16 @@ const source = await readFile(new URL('events-sync.js', root), 'utf8');
 const manifest = JSON.parse(await readFile(new URL('data/tech-week-enriched.parts.json', root), 'utf8'));
 const fullText = (await Promise.all(manifest.parts.map(name => readFile(new URL(`data/${name}`, root), 'utf8')))).join('');
 const full = JSON.parse(fullText);
+
+// events-sync lists the Bay Area only: one saved listing carries a New York
+// address, so the programme the game is handed is the saved feed minus any
+// listing outside the region. Mirrors BAY_AREA in events-sync.js — if that
+// window moves, these counts move with it and say so.
+const inBayArea = (e) => e.lat == null || e.lng == null
+  || !Number.isFinite(Number(e.lat)) || !Number.isFinite(Number(e.lng))
+  || (Number(e.lat) > 36.9 && Number(e.lat) < 38.4 && Number(e.lng) > -123.2 && Number(e.lng) < -121.5);
+const listed = full.events.filter(inBayArea);
+
 const baseline = JSON.parse(await readFile(new URL('data/tech-week-first.json', root), 'utf8'));
 const shipped = JSON.parse(await readFile(new URL('data/venue-overrides.json', root), 'utf8'));
 const partText = new Map(await Promise.all(manifest.parts.map(async name => [name, await readFile(new URL(`data/${name}`, root), 'utf8')])));
@@ -56,7 +66,7 @@ function harness(route = () => undefined) {
       await flush();
       for (const [id, fn] of [...timers]) { timers.delete(id); fn(); }
       await flush();
-      if (refreshes.some(r => r.list.length >= full.events.length)) return;
+      if (refreshes.some(r => r.list.length >= listed.length)) return;
     }
   };
   return { read: async () => { await window.__sfEventFeed.read(seed); await settle(); return window.__sfEventFeed.read(seed); }, refreshes };
@@ -83,7 +93,7 @@ test('the shipped venue-overrides.json is well formed and publishes no door', ()
 test('supplements append missing listings and apply building-level venues with the door withheld', async () => {
   const h = harness(name => name === 'venue-overrides.json' ? { data: overrides } : undefined);
   const result = await h.read();
-  assert.equal(result.list.length, full.events.length + 1, 'one supplemental listing appended');
+  assert.equal(result.list.length, listed.length + 1, 'one supplemental listing appended');
   const extra = result.list.find(e => e.id === 'supplement-test');
   assert.equal(extra.supplemental, true);
   assert.equal(extra.venue, 'AGI House SF');
@@ -120,8 +130,8 @@ test('a moderator-approved entry outranks the supplement for the same event, fie
 test('no overrides file leaves the public feed exactly as the crawl published it', async () => {
   const h = harness();
   const result = await h.read();
-  assert.equal(result.list.length, full.events.length);
-  assert.deepEqual(Array.from(result.list, e => e.id), full.events.map(e => e.id));  // Array.from: the list is a vm-realm array
+  assert.equal(result.list.length, listed.length);
+  assert.deepEqual(Array.from(result.list, e => e.id), listed.map(e => e.id));  // Array.from: the list is a vm-realm array
 });
 
 import { slimFeed, streetOnly } from '../feed-slim.mjs';

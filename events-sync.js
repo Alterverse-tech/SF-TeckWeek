@@ -185,7 +185,19 @@ const NEIGHBORHOOD_HINTS = {
   'hayes valley': { lat: 37.7767, lng: -122.4292 },
   'civic center': { lat: 37.7786, lng: -122.4156 },
   'golden gate park': { lat: 37.7690, lng: -122.4827 },
-  'fi di': { lat: 37.7937, lng: -122.4008 }
+  'fi di': { lat: 37.7937, lng: -122.4008 },
+  // The districts the city itself already names and places (NEIGHBORHOODS in
+  // the game source), with its own coordinates. Without them an event in the
+  // Marina or on Russian Hill had nothing to fall back to, so it went
+  // unplaced — or worse, read its own street number as a latitude.
+  'chinatown': { lat: 37.7941, lng: -122.4078 },
+  'north beach': { lat: 37.8060, lng: -122.4103 },
+  'russian hill': { lat: 37.8014, lng: -122.4189 },
+  'marina': { lat: 37.8030, lng: -122.4360 },
+  'presidio': { lat: 37.7989, lng: -122.4662 },
+  'potrero hill': { lat: 37.7605, lng: -122.4005 },
+  // The same hill, named for its lower slope on the public calendar.
+  'lower nob hill': { lat: 37.7930, lng: -122.4161 }
 };
 
 function toNumber(value) {
@@ -206,7 +218,13 @@ function stripNeighborhoodSuffix(value) {
 
 function getCoordsFromText(value) {
   if (!value) return null;
-  const match = String(value).match(/(-?\d{1,3}(?:\.\d+)?),?\s*(-?\d{1,3}(?:\.\d+)?)/);
+  // A coordinate pair written out looks like "37.7749, -122.4194": decimal
+  // degrees, with a separator between them. Both used to be optional, so
+  // "300 Grant St" parsed as 30 and 0 and "735 Montgomery St" as 73 and 5 —
+  // house numbers read as latitudes, which planted San Francisco events
+  // thousands of kilometres out to sea and stretched the city's bounds with
+  // them. A house number is not a coordinate.
+  const match = String(value).match(/(-?\d{1,3}\.\d+)\s*[,;]\s*(-?\d{1,3}\.\d+)/);
   if (!match) return null;
 
   const lat = toNumber(match[1]);
@@ -344,6 +362,28 @@ function appendSupplementalEvents(events, extra) {
   const added = extra.filter(event => event && event.id && !seen.has(event.id) && !seen.has(eventKey(event))).map(event => ({ ...event, supplemental: true }));
   return added.length ? [...events, ...added] : events;
 }
+// The San Francisco calendar covers the Bay Area, and the city itself draws
+// only part of it. A listing whose coordinate is outside the region entirely
+// is mis-filed rather than out of town — one New York address in the SF feed
+// put the edge of the city 11,500 km out — so it is not in this calendar.
+const BAY_AREA = { minLat: 36.9, maxLat: 38.4, minLng: -123.2, maxLng: -121.5 };
+function inTheBayArea(event) {
+  // `Number(null)` is 0, which is a perfectly finite point off West Africa:
+  // an event without coordinates has to be recognised as such, not placed.
+  if (event.lat == null || event.lng == null) return true;
+  const lat = Number(event.lat), lng = Number(event.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return true;   // no coordinate, no claim either way
+  return lat > BAY_AREA.minLat && lat < BAY_AREA.maxLat && lng > BAY_AREA.minLng && lng < BAY_AREA.maxLng;
+}
+function dropDistantListings(events) {
+  const kept = [];
+  for (const event of events) {
+    if (inTheBayArea(event)) kept.push(event);
+    else console.warn('[TW] outside the Bay Area, not listed:', event.title, event.address);
+  }
+  return kept;
+}
+
 function applyApprovedAddresses(events, addresses) {
   if (!addresses.length) return events;
   const byId = new Map(), byUrl = new Map();
@@ -361,6 +401,9 @@ function applyApprovedAddresses(events, addresses) {
     const street = entry.street || entry.address;
     if (street) patched.address = street;
     if (entry.venue) patched.venue = entry.venue;
+    // The crawl reads an event page once. When the host renames the event
+    // afterwards, the owner's reading of the live page is the newer one.
+    if (entry.title) patched.title = entry.title;
     if (entry.neighborhood) patched.neighborhood = entry.neighborhood;
     if (Number.isFinite(entry.lat) && Number.isFinite(entry.lng)) {
       // A reviewed address is exact: drop the neighbourhood approximation.
@@ -438,12 +481,12 @@ window.__sfEventFeed = {
     // optional address and host-detail presentation patches.
     const data = mergePublicFeeds(lastGood, mergePublicFeeds(fullSaved || saved, cache));
     if (data) lastGood = data;
-    const live = lastGood && { ...lastGood, events: applyHostDetail(applyApprovedAddresses(appendSupplementalEvents(lastGood.events, overrides.events), mergeAddressEntries(overrides.addresses, approvedAddresses))) };
+    const live = lastGood && { ...lastGood, events: dropDistantListings(applyHostDetail(applyApprovedAddresses(appendSupplementalEvents(lastGood.events, overrides.events), mergeAddressEntries(overrides.addresses, approvedAddresses)))) };
     showStatus(live ? {...live,error:cache.error} : cache, !!live);
     initialReadDelivered = true;
     if (live) return { list: enrichWithFallbackCoordinates(live.events), citizens: [], official: true,
       source: `Official public sources · ${live.events.length} events · ${live.coverage?.complete ? 'full calendar, partial details' : 'partial snapshot'} · saved ${live.fetchedAt}` };
-    return { list: enrichWithFallbackCoordinates(applyHostDetail(seed.events || [])), citizens: seed.citizens || [], official: !!seed.publicSnapshot,
+    return { list: enrichWithFallbackCoordinates(dropDistantListings(applyHostDetail(seed.events || []))), citizens: seed.citizens || [], official: !!seed.publicSnapshot,
       source: seed.publicSnapshot ? 'Public Tech Week startup snapshot · live sync pending' : 'Sample programme · live sync pending' };
   },
 };
