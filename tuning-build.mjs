@@ -27,6 +27,9 @@ export const RSVP_MIN = 50;                              // below this an event 
 // big any more. Matched against host, cohosts and title.
 export const SPOTLIGHT = { hosts: ['a16z'], titles: ['official tech week kickoff'] };
 export const SPOTLIGHT_MAX = 5;
+// San Francisco as this city draws it: the peninsula, its bay shore and the
+// Golden Gate Bridge. A coordinate outside this window is somewhere else.
+export const CITY = { minLat: 37.70, maxLat: 37.84, minLng: -122.53, maxLng: -122.34 };
 export const DISCORD_INVITE = 'https://discord.gg/GPPgjHE7GF';
 
 export function wireTuning(html) {
@@ -101,7 +104,9 @@ export function wireTuning(html) {
       // airship for the busy events that have no address yet. An addressed
       // event never also gets a ship — that is what used to crowd the sky over
       // SOMA and the Financial District.
-      ev.wantsVehicle = ev.featured || ((ev.spotlightPick || rsvpCount(ev) > CFG.rsvpMin) && !ev.claimed);
+      // Out of town is its own tier: no building to stand on, so it flies —
+      // and it flies at the Golden Gate, where the city ends.
+      ev.wantsVehicle = ev.featured || ev.outOfTown || ((ev.spotlightPick || rsvpCount(ev) > CFG.rsvpMin) && !ev.claimed);
       // A district is a place too: an event that names its neighbourhood gets a
       // sign on a building there, once anyone has RSVP'd. Finding it is the point.
       ev.onMap = ev.wantsVehicle || ev.claimed || (ev.approxLocation && rsvpCount(ev) > 0);
@@ -123,6 +128,20 @@ export function wireTuning(html) {
         const p = GEO.Hn(CFG.featured.lng, CFG.featured.lat, 0); ev.venueKey = 'featured';
         ev.world = V3(p.x, 0, p.z); ev.ground = c.sampleTerrain(CFG.featured.lng, CFG.featured.lat) || 0;
         ev.roof = ev.ground; ev.shipY = CFG.featured.y; ev.anchorY = ev.ground + 8;
+        continue;
+      }
+      // The gateway. An event out at Stanford or Berkeley is a real Tech Week
+      // event that simply is not in this city, so it waits in the air by the
+      // Golden Gate Bridge — the way out of town — anchored on the bridge's
+      // own surveyed south tower rather than on a coordinate off the map.
+      if (ev.outOfTown) {
+        const k = gatewayIndex++, cols = Math.max(1, Math.ceil(Math.sqrt(gatewayTotal)));
+        const col = k % cols, row = Math.floor(k / cols);
+        const lng = GATEWAY.lng + 0.0024 + col * 0.0021, lat = GATEWAY.lat - 0.0015 - row * 0.0017;
+        const p = GEO.Hn(lng, lat, 0);
+        ev.venueKey = 'gateway'; ev.world = V3(p.x, 0, p.z);
+        ev.ground = c.sampleTerrain(lng, lat) || 0; ev.roof = ev.ground;
+        ev.shipY = 152 + row * 24 + (col % 2) * 15; ev.anchorY = ev.ground + 8;
         continue;
       }
       // A neighbourhood centroid is not an address: fan these out over the
@@ -152,11 +171,20 @@ export function wireTuning(html) {
   // Only events that will actually be drawn take a harbour slot, so the grid
   // stays the size of the visible fleet.
   once("const slots = new Map(); let harborIndex = 0; const unclaimed = state.events.filter((e) => !e.claimed).length;",
-    "const slots = new Map(); let harborIndex = 0; const unclaimed = Math.max(1, state.events.filter((e) => !e.claimed && !e.approxLocation && !e.featured && e.onMap).length);");
+    "const slots = new Map(); let harborIndex = 0; let gatewayIndex = 0; const GATEWAY = { lat: 37.8140068361, lng: -122.4778722111 }; const gatewayTotal = Math.max(1, state.events.filter((e) => e.outOfTown).length); const unclaimed = Math.max(1, state.events.filter((e) => !e.claimed && !e.approxLocation && !e.outOfTown && !e.featured && e.onMap).length);");
 
-  // An approximate location is never presented as a verified address.
+  // An approximate location is never presented as a verified address, and a
+  // coordinate this city does not cover is not an address in this city at all.
+  // Tech Week fills Berkeley, Palo Alto, Stanford and Half Moon Bay too; those
+  // events used to be planted at their real coordinate, tens of kilometres
+  // past the edge of the drawn world, where nothing renders — and they
+  // stretched the city's own bounds out with them. They gather at the Golden
+  // Gate instead. The window is San Francisco as this city draws it: the
+  // peninsula, its bay shore, and the bridge.
   once("ev.claimed = ev.lat != null && ev.lng != null && Number.isFinite(+ev.lat) && Number.isFinite(+ev.lng);",
-    "ev.claimed = !ev.approxLocation && ev.lat != null && ev.lng != null && Number.isFinite(+ev.lat) && Number.isFinite(+ev.lng);");
+    `ev.outOfTown = ev.lat != null && ev.lng != null && Number.isFinite(+ev.lat) && Number.isFinite(+ev.lng)
+      && !(+ev.lat > ${CITY.minLat} && +ev.lat < ${CITY.maxLat} && +ev.lng > ${CITY.minLng} && +ev.lng < ${CITY.maxLng});
+    ev.claimed = !ev.approxLocation && !ev.outOfTown && ev.lat != null && ev.lng != null && Number.isFinite(+ev.lat) && Number.isFinite(+ev.lng);`);
 
   // A wider, sparser holding pattern: the grid step grows with the fleet size.
   once("const cols = Math.ceil(Math.sqrt(unclaimed)); const lng = CFG.harbor.lng + (unclaimed <= 24 ? k - (unclaimed - 1) / 2 : k % cols - (cols - 1) / 2) * 0.00125, lat = CFG.harbor.lat + (unclaimed <= 24 ? k % 2 : Math.floor(k / cols) - (Math.ceil(unclaimed / cols) - 1) / 2) * 0.0009;",
@@ -209,9 +237,9 @@ export function wireTuning(html) {
   once("  const catOf = (ev) => (ev.claimed ? CATS[ev.category] || CATS.founders : CATS.unclaimed);",
     "  const catOf = (ev) => CATS[ev.category] || CATS.founders;");
   once("const k = ev.claimed ? (ev.neighborhood || ev.venue || 'Downtown') : 'Harbor · unclaimed'",
-    "const k = ev.claimed ? (ev.neighborhood || ev.venue || 'Downtown') : ev.approxLocation ? (ev.neighborhood || 'Downtown') : 'Venue to be announced'");
+    "const k = ev.claimed ? (ev.neighborhood || ev.venue || 'Downtown') : ev.outOfTown ? (ev.neighborhood || 'Out of town') : ev.approxLocation ? (ev.neighborhood || 'Downtown') : 'Venue to be announced'");
   once("name: m0.claimed ? (m0.venue || m0.address) : 'Harbor'",
-    "name: m0.claimed ? (m0.venue || m0.address) : m0.approxLocation ? (m0.neighborhood || 'District') : 'Downtown'");
+    "name: m0.claimed ? (m0.venue || m0.address) : m0.outOfTown ? 'Out of town · Golden Gate' : m0.approxLocation ? (m0.neighborhood || 'District') : 'Downtown'");
   once("ev.chip.classList.toggle('unclaimed', !ev.claimed)", "ev.chip.classList.toggle('unclaimed', false)");
   // The sky is for the ships. A signed building wears its posters on the wall;
   // the little kite that used to fly from its roof is not drawn (it still

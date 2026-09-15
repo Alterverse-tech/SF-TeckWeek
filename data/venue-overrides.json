@@ -1,6 +1,6 @@
 {
-  "note": "Game-layer venue supplements entered by the project owner from public event pages. Only the building is published: `street` never carries a house number or unit, `lat`/`lng` are filled by scripts/geocode-venue-overrides.mjs (run where the network allows; the full address lives only in the gitignored .local/venue-doors.json), and the exact door stays in the Discord. `events` are listings the public crawl has not picked up yet: appended at runtime. Give a supplement its registration `url` — that is how it is recognised and dropped once the crawl carries the same event; without one it would be listed twice. A moderator-approved entry from /addresses.json takes precedence over an entry here for the same event.",
-  "updatedAt": "2026-09-14T00:00:00.000Z",
+  "note": "Game-layer venue supplements entered by the project owner from public event pages. Only the building is published: `street` never carries a house number or unit, `lat`/`lng` are filled by scripts/geocode-venue-overrides.mjs (run where the network allows; the full address lives only in the gitignored .local/venue-doors.json), and the exact door stays in the Discord. An entry may also carry a `title`, for when the host renamed the event after the crawl last read its page. `events` are listings the public crawl has not picked up yet: appended at runtime. Give a supplement its registration `url` — that is how it is recognised and dropped once the crawl carries the same event; without one it would be listed twice. A moderator-approved entry from /addresses.json takes precedence over an entry here for the same event.",
+  "updatedAt": "2026-09-15T00:00:00.000Z",
   "addresses": [
     {
       "eventId": "partiful-IDX1j40sjTDhK6Pp5ewl",
@@ -178,7 +178,9 @@
       "lng": null,
       "doorWithheld": true,
       "source": "public event page, entered by the project owner",
-      "enteredAt": "2026-09-14T00:00:00.000Z"
+      "enteredAt": "2026-09-14T00:00:00.000Z",
+      "title": "HyperFrames Launch CLUB",
+      "titleSource": "live event page, read by the project owner after the crawl"
     }
   ],
   "events": []
