@@ -197,7 +197,12 @@ const NEIGHBORHOOD_HINTS = {
   'presidio': { lat: 37.7989, lng: -122.4662 },
   'potrero hill': { lat: 37.7605, lng: -122.4005 },
   // The same hill, named for its lower slope on the public calendar.
-  'lower nob hill': { lat: 37.7930, lng: -122.4161 }
+  'lower nob hill': { lat: 37.7930, lng: -122.4161 },
+  // Districts resolved by scripts/geocode-neighborhoods.mjs, which rewrites
+  // everything between these two markers. Run it where the network allows;
+  // the calendar names districts this file would otherwise have to guess.
+  /* districts:start */
+  /* districts:end */
 };
 
 function toNumber(value) {
