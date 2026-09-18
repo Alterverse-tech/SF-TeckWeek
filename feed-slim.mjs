@@ -6,7 +6,10 @@ import { readFile, writeFile, rm } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
-const DROP = ['fieldSources', 'imageUsage', 'calendarUrl', 'calendarId', 'locationVisibility', 'source', 'sourceLabel', 'acquisition'];
+// sourceConflicts and duplicateCalendarIds are provenance of the same kind as
+// fieldSources: they record which reading the merge kept and what it replaced or
+// folded in. The game shows the kept value, never the audit trail.
+const DROP = ['fieldSources', 'sourceConflicts', 'duplicateCalendarIds', 'imageUsage', 'calendarUrl', 'calendarId', 'locationVisibility', 'source', 'sourceLabel', 'acquisition'];
 
 // Same door test as scripts/merge-approved-addresses.mjs: a leading house
 // number (not an ordinal street like 11th St) and any floor, suite or unit.
